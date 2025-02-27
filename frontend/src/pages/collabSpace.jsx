@@ -4,6 +4,8 @@ import Chat from "../components/chat";
 import { useParams } from "react-router-dom";
 import PdfView from "../components/pdfview";
 import { Canvas } from "../components/wboard";
+import VideoRoom from "../components/video";
+
 function CollabSpace() {
   const { roomCode } = useParams();
 
@@ -15,6 +17,7 @@ function CollabSpace() {
           <Canvas roomCode={roomCode} />
         </div>
         <PdfView roomCode={roomCode} />
+        <VideoRoom roomCode={roomCode} />
       </div>
     </>
   );
