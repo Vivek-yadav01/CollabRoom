@@ -241,6 +241,47 @@ io.on("connection", (socket) => {
     });
   };
 
+  // handle fetch all users
+
+  socket.on("fetch-users", (roomCode) => {
+    console.log(socket.id, "fetch");
+    const room = rooms.get(roomCode);
+    const usersInRoom = Array.from(room?.users || []);
+    console.log("Users in room:", usersInRoom);
+
+    const users = usersInRoom.filter((id) => id !== socket.id); // Exclude self
+    console.log("Users to send:", users);
+
+    socket.emit("users", users); // Send to the requesting client all other users
+  });
+
+  socket.on("offer", (data) => {
+    console.log("Offer from", data.from, "to", data.to);
+    socket.to(data.to).emit("offer", {
+      offer: data.offer,
+      from: data.from,
+      to: data.to,
+    }); // Send offer to specific user
+  });
+
+  socket.on("ice-candidate", (data) => {
+    console.log("Ice candidate from", data.from, "to", data.to);
+    socket.to(data.to).emit("ice-candidate", {
+      candidate: data.candidate,
+      from: data.from,
+      to: data.to, // FIX: Ensure "to" matches the intended recipient
+    });
+  });
+
+  socket.on("answer", (data) => {
+    console.log("Answer from", data.from, "to", data.to);
+    socket.to(data.to).emit("answer", {
+      answer: data.answer,
+      from: data.from, // FIX: Correct "from"
+      to: data.to, // FIX: Correct "to"
+    });
+  });
+
   // Handle disconnection
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
