@@ -39,6 +39,17 @@ function Home() {
             className="border border-gray-300 rounded-md p-2 mr-2"
           />
           <button
+            onClick={() => {
+              navigator.clipboard.readText().then((text) => {
+                setRoomCode(text);
+              });
+            }}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md mr-2"
+          >
+            PASTE
+          </button>
+
+          <button
             onClick={handleJoinRoom}
             className="bg-blue-500 text-white px-4 py-2 rounded-md"
           >

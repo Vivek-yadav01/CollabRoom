@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import socket from "../utils/socket";
 import { useLocation } from "react-router-dom";
@@ -126,13 +126,23 @@ function FileView({ roomCode }) {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">File Viewer</h1>
-
-      <input
-        type="text"
-        placeholder="Enter Room Code"
-        value={roomCode}
-        className="border p-2 rounded mr-2"
-      />
+      <div>
+        <input
+          type="text"
+          placeholder="Enter Room Code"
+          value={roomCode}
+          className="border p-2 rounded mr-2"
+          readOnly // Prevents accidental edits
+        />
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(roomCode);
+          }}
+          className="bg-blue-500 text-white p-2 rounded"
+        >
+          Copy
+        </button>
+      </div>
 
       <input
         type="file"
