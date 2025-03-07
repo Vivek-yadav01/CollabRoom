@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
@@ -6,6 +7,15 @@ const cors = require("cors");
 const path = require("path");
 const e = require("express");
 const fs = require("fs");
+
+// cloudinary Configurations
+const cloudinary = require("cloudinary").v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -77,6 +87,60 @@ app.use(
 // Store active rooms and their data
 const rooms = new Map();
 
+//Delete file from server
+function deleteFile(filePath) {
+  fs.unlink(filePath, (err) => {
+    if (err) {
+      console.error("Error deleting file:", err);
+    } else {
+      console.log("File deleted successfully");
+    }
+  });
+}
+
+// handling file upload to cloudinary
+
+async function uploadFileToCloudinary(req, res) {
+  const resourceType =
+    req.file.mimetype === "application/pdf" ? "raw" : "image";
+  const roomCode = req.body.roomCode;
+  const room = rooms.get(roomCode);
+
+  await cloudinary.uploader.upload(
+    req.file.path,
+    {
+      resource_type: resourceType,
+      use_filename: true, // Keeps the original filename
+      unique_filename: false, // Prevents duplicate filenames
+      access_mode: "public",
+    },
+    (err, result) => {
+      if (err) {
+        console.error("Error uploading file to cloudinary:", err);
+        res.status(500).json({ error: "Error uploading file" });
+      } else {
+        // File uploaded successfully
+        // remove uploaded file from server
+        deleteFile(req.file.path);
+        const fileInfo = {
+          filename: result.public_id,
+          originalName: req.file.originalname,
+          path: result.secure_url,
+          type: path.extname(req.file.originalname).toLowerCase(),
+        };
+        console.log("File info:", fileInfo);
+
+        if (!room?.files) room.files = [];
+        room.files.push(fileInfo);
+        io.to(roomCode).emit("file-uploaded", fileInfo);
+        console.log("File uploaded:", fileInfo);
+
+        res.json(fileInfo);
+      }
+    }
+  );
+}
+
 // Handle file upload
 app.post("/upload", (req, res) => {
   upload(req, res, (err) => {
@@ -88,22 +152,8 @@ app.post("/upload", (req, res) => {
       } else {
         const roomCode = req.body.roomCode;
         const room = rooms.get(roomCode);
-        if (room) {
-          const fileInfo = {
-            filename: req.file.filename,
-            originalName: req.file.originalname,
-            path: `/uploads/${req.file.filename}`,
-            type: path.extname(req.file.originalname).toLowerCase(),
-          };
-          if (!room.files) room.files = [];
-          room.files.push(fileInfo);
-          io.to(roomCode).emit("file-uploaded", fileInfo);
-          console.log("File uploaded:", fileInfo);
-
-          res.json(fileInfo);
-        } else {
-          res.status(404).json({ error: "Room not found" });
-        }
+        //  file uploaded now lets upload it to cloudinary
+        uploadFileToCloudinary(req, res);
       }
     }
   });
@@ -112,9 +162,12 @@ app.post("/upload", (req, res) => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
+  const userMap = new Map();
+
   // Create a new room
-  socket.on("create-room", () => {
+  socket.on("create-room", (username) => {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    userMap.set(socket.id, username);
     const room = {
       users: new Set([socket.id]),
       documents: new Map(),
@@ -130,11 +183,16 @@ io.on("connection", (socket) => {
     socket.join(roomCode);
     socket.emit("room-created", roomCode);
   });
+  // set username
+  socket.on("set-username", (username) => {
+    userMap.set(socket.id, username);
+  });
 
   // Join existing room
-  socket.on("join-room", (roomCode) => {
+  socket.on("join-room", ({ roomCode, username }) => {
     console.log("User joining room:", roomCode);
     if (rooms.has(roomCode)) {
+      userMap.set(socket.id, username);
       const room = rooms.get(roomCode);
       room.users.add(socket.id);
       socket.join(roomCode);
@@ -191,6 +249,7 @@ io.on("connection", (socket) => {
     if (rooms.has(roomCode)) {
       const room = rooms.get(roomCode);
       const chatMessage = {
+        username: userMap.get(socket.id),
         userId: socket.id,
         message,
         timestamp: Date.now(),
@@ -230,17 +289,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Delete file
-  const deleteFile = (filePath) => {
-    fs.unlink(filePath, (err) => {
-      if (err) {
-        console.error(`Error deleting file at ${filePath}:`, err);
-      } else {
-        console.log(`File deleted successfully: ${filePath}`);
-      }
-    });
-  };
-
   // handle fetch all users
 
   socket.on("fetch-users", (roomCode) => {
@@ -261,7 +309,8 @@ io.on("connection", (socket) => {
       offer: data.offer,
       from: data.from,
       to: data.to,
-    }); // Send offer to specific user
+      user: userMap.get(data.from),
+    });
   });
 
   socket.on("ice-candidate", (data) => {
@@ -269,7 +318,8 @@ io.on("connection", (socket) => {
     socket.to(data.to).emit("ice-candidate", {
       candidate: data.candidate,
       from: data.from,
-      to: data.to, // FIX: Ensure "to" matches the intended recipient
+      to: data.to,
+      user: userMap.get(data.from),
     });
   });
 
@@ -277,8 +327,9 @@ io.on("connection", (socket) => {
     console.log("Answer from", data.from, "to", data.to);
     socket.to(data.to).emit("answer", {
       answer: data.answer,
-      from: data.from, // FIX: Correct "from"
-      to: data.to, // FIX: Correct "to"
+      from: data.from,
+      to: data.to,
+      user: userMap.get(data.from),
     });
   });
 
@@ -287,13 +338,22 @@ io.on("connection", (socket) => {
     console.log("User disconnected:", socket.id);
     rooms.forEach((room, roomCode) => {
       if (room.users.has(socket.id)) {
-        room.users.delete(socket.id);
+        // room.users.delete(socket.id);
         io.to(roomCode).emit("user-left", socket.id);
         if (room.users.size === 0) {
           // here we have to delete the uploaded file also
+          //  already deleted files from the server
+          //  now we have to delete the files from cloudinary
+
           if (room.files) {
             room.files.forEach((file) => {
-              deleteFile(`public${file.path}`);
+              cloudinary.uploader.destroy(file.filename, (err, result) => {
+                if (err) {
+                  console.error("Error deleting file from cloudinary:", err);
+                } else {
+                  console.log("File deleted from cloudinary:", result);
+                }
+              });
             });
           }
 
