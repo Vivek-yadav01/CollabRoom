@@ -1,9 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import socket from "../utils/socket";
 import { useLocation } from "react-router-dom";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import toast from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `${
   import.meta.env.VITE_API_URL
@@ -18,24 +22,30 @@ function FileView({ roomCode }) {
   const [selectedFile, setSelectedFile] = useState(
     data?.activePdf?.filename || null
   );
+  const [openUploadDialog, setOpenUploadDialog] = useState(false);
+  const [openFileListDialog, setOpenFileListDialog] = useState(false);
 
-  // Fetch latest room data when a new user joins
   useEffect(() => {
     if (roomCode) {
       socket.emit("fetch-room-data", { roomCode });
 
       socket.on("room-data", (roomData) => {
-        console.log("Room Data received:", roomData);
-        setFileList(roomData.files);
-        setSelectedFile(roomData.activePdf?.filename || null);
-        setPage(roomData.activePdf?.page || 1);
+        setFileList(roomData?.files || []);
+        setSelectedFile(roomData?.activePdf?.filename || null);
+        setPage(roomData?.activePdf?.page || 1);
       });
 
-      return () => {
-        socket.off("room-data");
-      };
+      return () => socket.off("room-data");
     }
   }, [roomCode]);
+
+  useEffect(() => {
+    socket.on("file-uploaded", (fileInfo) => {
+      setFileList((prevList) => [...prevList, fileInfo]);
+    });
+
+    return () => socket.off("file-uploaded");
+  }, []);
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
@@ -43,9 +53,10 @@ function FileView({ roomCode }) {
 
   const handleUpload = async () => {
     if (!file || !roomCode) {
-      alert("Select a file and enter a room code!");
+      toast.error("Please select a file to upload.");
       return;
     }
+    toast.loading("Uploading file...");
 
     const formData = new FormData();
     formData.append("file", file);
@@ -58,46 +69,28 @@ function FileView({ roomCode }) {
       });
 
       if (response.ok) {
-        console.log("Upload successful");
+        toast.dismiss();
+
+        toast.success("File uploaded successfully!");
+        setOpenUploadDialog(false); // Close dialog after upload
       } else {
         alert("Upload failed!");
       }
     } catch (error) {
+      toast.dismiss();
       console.error("Upload error:", error);
-      alert("Error uploading file.");
+      toast.error("Upload failed!");
     }
   };
 
-  useEffect(() => {
-    socket.on("file-uploaded", (fileInfo) => {
-      console.log("File uploaded:", fileInfo);
-      setFileList((prevList) => [...prevList, fileInfo]);
-    });
-
-    return () => {
-      socket.off("file-uploaded");
-    };
-  }, []);
-
   const handleFileSelect = (file) => {
+    setOpenFileListDialog(false);
     socket.emit("pdf-file-change", { roomCode, filename: file.path });
 
     socket.on("pdf-file-updated", (data) => {
-      console.log("File updated:", data);
       setSelectedFile(data.filename);
     });
   };
-
-  useEffect(() => {
-    socket.on("pdf-file-updated", (data) => {
-      console.log("File updated:", data);
-      setSelectedFile(data.filename);
-    });
-
-    return () => {
-      socket.off("pdf-file-updated");
-    };
-  }, []);
 
   const changePage = (newPage) => {
     socket.emit("pdf-page-change", {
@@ -107,101 +100,105 @@ function FileView({ roomCode }) {
     });
 
     socket.on("pdf-page-updated", (data) => {
-      console.log("Page updated:", data);
       setPage(data.page);
     });
   };
 
-  useEffect(() => {
-    socket.on("pdf-page-updated", (data) => {
-      console.log("Page updated:", data);
-      setPage(data.page);
-    });
-
-    return () => {
-      socket.off("pdf-page-updated");
-    };
-  }, []);
+  const copyRoomCode = () => {
+    navigator.clipboard.writeText(roomCode);
+    toast.success("Room code copied!");
+  };
 
   return (
-    <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">File Viewer</h1>
-      <div>
-        <input
-          type="text"
-          placeholder="Enter Room Code"
-          value={roomCode}
-          className="border p-2 rounded mr-2"
-          readOnly // Prevents accidental edits
-        />
-        <button
-          onClick={() => {
-            navigator.clipboard.writeText(roomCode);
-          }}
-          className="bg-blue-500 text-white p-2 rounded"
-        >
-          Copy
-        </button>
-      </div>
-
-      <input
-        type="file"
-        accept="image/*,.pdf,.doc,.docx,.txt"
-        onChange={handleFileChange}
-      />
-      <button
-        className="bg-blue-500 text-white px-4 py-2 rounded ml-2"
-        onClick={handleUpload}
+    <div className="p-4 flex flex-col items-center mt-16">
+      {/* Copy Room Code Button */}
+      <Button
+        variant="outline"
+        onClick={copyRoomCode}
+        className="mb-4 bg-gray-800 text-white"
       >
-        Upload
-      </button>
+        Copy Room Code
+      </Button>
 
-      {/* File List */}
-      <div className="mt-4 border p-4 rounded">
-        <h2 className="text-lg font-semibold">Uploaded Files</h2>
-        <ul className="mt-2">
-          {fileList.map((file, index) => (
-            <li
-              key={index}
-              className="text-blue-600 cursor-pointer underline"
-              onClick={() => handleFileSelect(file)}
+      {/* Buttons */}
+      <div className="flex gap-4">
+        {/* Upload Button */}
+        <Dialog open={openUploadDialog} onOpenChange={setOpenUploadDialog}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="bg-gray-800 text-white">
+              Upload File
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <h2 className="text-lg font-semibold">Upload a File</h2>
+            <input
+              type="file"
+              accept="image/*,.pdf,.doc,.docx,.txt"
+              onChange={handleFileChange}
+              className="border p-2 rounded w-full"
+            />
+            <Button
+              onClick={handleUpload}
+              className="mt-2 bg-gray-700 text-white"
             >
-              {file.originalName}
-            </li>
-          ))}
-        </ul>
+              Upload
+            </Button>
+          </DialogContent>
+        </Dialog>
+
+        {/* Show Uploaded Files Button */}
+        <Dialog open={openFileListDialog} onOpenChange={setOpenFileListDialog}>
+          <DialogTrigger asChild>
+            <Button variant="outline" className="bg-gray-800 text-white">
+              Show Uploaded Files
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <h2 className="text-lg font-semibold">Uploaded Files</h2>
+            <ul className="mt-2">
+              {fileList.map((file, index) => (
+                <li
+                  key={index}
+                  className="text-blue-600 cursor-pointer underline"
+                  onClick={() => handleFileSelect(file)}
+                >
+                  {file.originalName}
+                </li>
+              ))}
+            </ul>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* File Viewer */}
       {selectedFile && (
-        <div className="mt-4 border p-4 rounded">
-          <h2 className="text-lg font-semibold mb-2">File Viewer</h2>
-          <div className="border p-2">
+        <div className="mt-4 border p-4 rounded w-full max-w-3xl">
+          <div className="border p-2 overflow-auto max-h-[80vh]">
             {selectedFile.endsWith(".pdf") ? (
               <>
-                <Document
-                  file={`${import.meta.env.VITE_API_URL}${selectedFile}`}
-                >
-                  <Page pageNumber={page} />
+                <Document file={`${selectedFile}`} className="overflow-auto">
+                  <Page pageNumber={page} className="max-w-full h-auto" />
                 </Document>
                 <div className="flex justify-between mt-2">
-                  <button
+                  <Button
+                    variant="outline"
                     onClick={() => changePage(page - 1)}
-                    className="px-4 py-2 bg-gray-300 rounded"
+                    className="px-4 py-2 bg-gray-700 text-white"
                   >
                     ←
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="outline"
                     onClick={() => changePage(page + 1)}
-                    className="px-4 py-2 bg-gray-300 rounded"
+                    className="px-4 py-2 bg-gray-700 text-white"
                   >
                     →
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : selectedFile.match(/\.(jpeg|jpg|png|gif)$/) ? (
               <img
-                src={`${import.meta.env.VITE_API_URL}${selectedFile}`}
+                src={`${selectedFile}`}
                 alt="Uploaded"
                 className="max-w-full h-auto"
               />

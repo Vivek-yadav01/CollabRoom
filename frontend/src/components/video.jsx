@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import socket from "../utils/socket";
+import { data } from "react-router-dom";
 
 export default function VideoRoom({ roomCode }) {
   console.log("VideoRoom initialized with roomCode:", roomCode);
@@ -47,24 +48,28 @@ export default function VideoRoom({ roomCode }) {
 
               // Stop/Start Video button
               const videoButton = document.createElement("button");
-              videoButton.innerHTML = "Stop Video";
+              videoButton.innerHTML = "Stop";
               videoButton.onclick = () => {
                 stream.getVideoTracks().forEach((track) => {
                   track.enabled = !track.enabled;
                 });
                 videoButton.innerHTML = stream.getVideoTracks()[0].enabled
-                  ? "Stop Video"
-                  : "Start Video";
+                  ? "Stop "
+                  : "Start ";
               };
-
-              const heading = document.createElement("h1");
-              heading.innerHTML = "Local Video";
 
               const div = document.createElement("div");
               div.appendChild(localVideo);
-              div.appendChild(videoButton);
-              div.appendChild(muteButton);
-              div.appendChild(heading);
+              const div2 = document.createElement("div");
+              div2.appendChild(videoButton);
+              div2.appendChild(muteButton);
+              div.appendChild(div2);
+              div2.classList.add("flex");
+              div2.classList.add("flex-row");
+              div2.classList.add("justify-center");
+
+              div2.classList.add("space-x-2");
+
               videoRoom.appendChild(div);
             })
             .catch((err) => console.error("Local video playback error:", err));
@@ -156,20 +161,23 @@ export default function VideoRoom({ roomCode }) {
                 vdoff.onclick = () => {
                   if (remoteVideo.paused) {
                     remoteVideo.play();
-                    vdoff.innerHTML = "Stop Video";
+                    vdoff.innerHTML = "Stop ";
                   } else {
                     remoteVideo.pause();
-                    vdoff.innerHTML = "Start Video";
+                    vdoff.innerHTML = "Start ";
                   }
                 };
-                const h1 = document.createElement("h1");
-                h1.innerHTML = "Remote Video of " + data.from;
+                const h2 = document.createElement("h1");
+                h2.innerHTML = data.user;
 
                 const div = document.createElement("div");
+                const div2 = document.createElement("div");
+                div2.appendChild(vdoff);
+                div2.appendChild(btn);
                 div.appendChild(remoteVideo);
-                div.appendChild(vdoff);
-                div.appendChild(btn);
-                div.appendChild(h1);
+                div.appendChild(div2);
+
+                div.appendChild(h2);
                 div.id = "video-" + data.from;
                 document.querySelector(".videoroom").appendChild(div);
 
@@ -290,22 +298,25 @@ export default function VideoRoom({ roomCode }) {
               }
             };
             const vdoff = document.createElement("button");
-            vdoff.innerHTML = "Stop Video";
+            vdoff.innerHTML = "Stop ";
             vdoff.onclick = () => {
               if (remoteVideo.paused) {
                 remoteVideo.play();
-                vdoff.innerHTML = "Stop Video";
+                vdoff.innerHTML = "Stop ";
               } else {
                 remoteVideo.pause();
-                vdoff.innerHTML = "Start Video";
+                vdoff.innerHTML = "Start ";
               }
             };
             const h1 = document.createElement("h1");
-            h1.innerHTML = "Remote Video of " + user;
+            h1.innerHTML = data?.user || "User";
             const div = document.createElement("div");
+            const div2 = document.createElement("div");
+            div2.appendChild(vdoff);
+            div2.appendChild(btn);
             div.appendChild(remoteVideo);
-            div.appendChild(vdoff);
-            div.appendChild(btn);
+            div.appendChild(div2);
+
             div.appendChild(h1);
             div.id = "video-" + user;
             document.querySelector(".videoroom").appendChild(div);
@@ -315,5 +326,5 @@ export default function VideoRoom({ roomCode }) {
     });
   }
 
-  return <div className="videoroom"></div>;
+  return <div className="videoroom  bg-gray-900"></div>;
 }

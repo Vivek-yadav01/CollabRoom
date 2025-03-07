@@ -1,0 +1,27 @@
+.videoroom > div {
+  padding: 5px;
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  /* Keeping the blue theme for contrast */
+
+  height: 200px;
+  width: 230px;
+  border: 2px solid rgb(75, 85, 99); /* Gray-700 theme */
+  outline: 1px solid rgb(107, 114, 128); /* Slightly lighter gray outline */
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.2); /* Soft shadow for depth */
+}
+.videoroom > div > div {
+  display: flex;
+  justify-content: space-evenly;
+}
+.videoroom {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+
+  margin-left: 40px;
+  overflow-x: hidden;
+}
