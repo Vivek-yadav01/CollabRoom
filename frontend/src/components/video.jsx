@@ -8,6 +8,7 @@ export default function VideoRoom({ roomCode }) {
   useEffect(() => {
     // handle user diconnection
     socket.on("user-left", (userId) => {
+      console.log("user left:", userId);
       console.log("User left:", userId);
       const video = document.getElementById(`video-${userId}`);
       if (video) {
@@ -157,7 +158,7 @@ export default function VideoRoom({ roomCode }) {
                 };
 
                 const vdoff = document.createElement("button");
-                vdoff.innerHTML = "Stop Video";
+                vdoff.innerHTML = "Stop ";
                 vdoff.onclick = () => {
                   if (remoteVideo.paused) {
                     remoteVideo.play();
@@ -231,16 +232,16 @@ export default function VideoRoom({ roomCode }) {
           }
         };
 
-        // peerConnection.onicecandidate = (e) => {
-        //   if (e.candidate) {
-        //     console.log("ICE Candidate found:", e.candidate);
-        //     socket.emit("ice-candidate", {
-        //       to: user,
-        //       candidate: e.candidate,
-        //       from: socket.id,
-        //     });
-        //   }
-        // };
+        peerConnection.onicecandidate = (e) => {
+          if (e.candidate) {
+            console.log("ICE Candidate found:", e.candidate);
+            socket.emit("ice-candidate", {
+              to: user,
+              candidate: e.candidate,
+              from: socket.id,
+            });
+          }
+        };
 
         socket.on("answer", async (data) => {
           console.log(

@@ -110,13 +110,14 @@ function FileView({ roomCode }) {
   };
 
   return (
-    <div className="p-4 flex flex-col items-center mt-16">
+    <div className="p-2 flex flex-col items-center mt-16">
       {/* Copy Room Code Button */}
       <Button
         variant="outline"
         onClick={copyRoomCode}
         className="mb-4 bg-gray-800 text-white"
       >
+        <span className="bg-white text-black rounded-sm px-2">{roomCode}</span>{" "}
         Copy Room Code
       </Button>
 

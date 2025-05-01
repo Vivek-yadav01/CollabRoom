@@ -10,7 +10,7 @@ socket.on("connect", () => {
   if (username) {
     socket.emit("set-username", username);
   }
-  if (roomCode) {
+  if (roomCode != undefined) {
     socket.emit("join-room", roomCode);
   }
 });

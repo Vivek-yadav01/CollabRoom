@@ -34,27 +34,56 @@ export const Canvas = ({ roomCode }) => {
     return () => socket.off("receive-stroke");
   }, []);
 
-  const startDrawing = (e) => {
-    setIsDrawing(true);
-    setStroke([]);
-    ctxRef.current.beginPath();
+  const getCoords = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    if (e.touches && e.touches.length > 0) {
+      const touch = e.touches[0];
+      return {
+        x: touch.clientX - rect.left,
+        y: touch.clientY - rect.top,
+      };
+    } else {
+      return {
+        x: e.nativeEvent.offsetX,
+        y: e.nativeEvent.offsetY,
+      };
+    }
   };
 
-  const endDrawing = () => {
+  const startDrawing = (e) => {
+    e.preventDefault();
+    const { x, y } = getCoords(e);
+    setIsDrawing(true);
+    setStroke([{ x, y }]);
+    ctxRef.current.beginPath();
+    ctxRef.current.moveTo(x, y);
+  };
+  const draw = (e) => {
+    if (!isDrawing) return;
+    e.preventDefault();
+
+    const { x, y } = getCoords(e);
+
+    // Check if pointer is within canvas bounds
+    const canvas = canvasRef.current;
+    if (x < 0 || y < 0 || x > canvas.width || y > canvas.height) {
+      endDrawing(); // Stop drawing if pointer goes out of bounds
+      return;
+    }
+
+    ctxRef.current.lineTo(x, y);
+    ctxRef.current.stroke();
+    setStroke((prev) => [...prev, { x, y }]);
+  };
+
+  const endDrawing = (e) => {
+    e.preventDefault();
     setIsDrawing(false);
     ctxRef.current.beginPath();
     if (stroke.length > 1) {
       socket.emit("send-stroke", { stroke, roomCode });
     }
-  };
-
-  const draw = (e) => {
-    if (!isDrawing) return;
-    const x = e.nativeEvent.offsetX;
-    const y = e.nativeEvent.offsetY;
-    ctxRef.current.lineTo(x, y);
-    ctxRef.current.stroke();
-    setStroke((prev) => [...prev, { x, y }]);
   };
 
   const redrawStroke = (strokeData) => {
@@ -87,10 +116,14 @@ export const Canvas = ({ roomCode }) => {
     <div className="flex flex-col items-center p-4 bg-gray-800 min-h-screen">
       <canvas
         ref={canvasRef}
-        className="border border-gray-300 shadow-md bg-white rounded-lg cursor-crosshair"
+        className="border border-gray-300 shadow-md bg-white rounded-lg cursor-crosshair touch-none"
         onMouseDown={startDrawing}
         onMouseUp={endDrawing}
         onMouseMove={draw}
+        onTouchStart={startDrawing}
+        onTouchEnd={endDrawing}
+        onTouchMove={draw}
+        onMouseLeave={endDrawing}
       />
       <button
         className="mt-4 px-6 py-2 bg-red-600 text-white font-medium rounded-md shadow hover:bg-red-700 transition-all"
