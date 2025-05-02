@@ -117,6 +117,7 @@ async function uploadFileToCloudinary(req, res) {
     (err, result) => {
       if (err) {
         console.error("Error uploading file to cloudinary:", err);
+        deleteFile(req.file.path);
         res.status(500).json({ error: "Error uploading file" });
       } else {
         // File uploaded successfully
