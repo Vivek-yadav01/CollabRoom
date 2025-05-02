@@ -86,6 +86,7 @@ app.use(
 
 // Store active rooms and their data
 const rooms = new Map();
+const userMap = new Map();
 
 //Delete file from server
 function deleteFile(filePath) {
@@ -163,12 +164,12 @@ app.post("/upload", (req, res) => {
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-  const userMap = new Map();
-
   // Create a new room
   socket.on("create-room", (username) => {
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    console.log("Room created:", username);
     userMap.set(socket.id, username);
+    console.log("User map:", userMap);
     const room = {
       users: new Set([socket.id]),
       documents: new Map(),
@@ -198,6 +199,7 @@ io.on("connection", (socket) => {
       room.users.add(socket.id);
       socket.join(roomCode);
       socket.emit("room-joined", room);
+      console.log("User map:", userMap);
     } else {
       socket.emit("room-joined", { success: false, error: "Room not found" });
     }
@@ -298,10 +300,18 @@ io.on("connection", (socket) => {
     const usersInRoom = Array.from(room?.users || []);
     console.log("Users in room:", usersInRoom);
 
-    const users = usersInRoom.filter((id) => id !== socket.id); // Exclude self
-    console.log("Users to send:", users);
+    const users = usersInRoom.filter((id) => id !== socket.id);
+    const userNames = users.map((id) => {
+      const userName = userMap.get(id);
+      return {
+        user: id,
+        userName: userName,
+      };
+    });
 
-    socket.emit("users", users); // Send to the requesting client all other users
+    console.log("Users to send:", userNames);
+
+    socket.emit("users", userNames); // Send to the requesting client all other users
   });
 
   socket.on("offer", (data) => {
