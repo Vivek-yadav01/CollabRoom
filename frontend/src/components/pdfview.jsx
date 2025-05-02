@@ -31,6 +31,7 @@ function FileView({ roomCode }) {
       socket.emit("fetch-room-data", { roomCode });
 
       socket.on("room-data", (roomData) => {
+        console.log("Room data received:", roomData);
         setFileList(roomData?.files || []);
         setSelectedFile(roomData?.activePdf?.filename || null);
         setPage(roomData?.activePdf?.page || 1);
@@ -44,8 +45,19 @@ function FileView({ roomCode }) {
     socket.on("file-uploaded", (fileInfo) => {
       setFileList((prevList) => [...prevList, fileInfo]);
     });
+    socket.on("pdf-file-updated", (data) => {
+      console.log("File updated:", data);
+      setSelectedFile(data.filename);
+    });
+    socket.on("pdf-page-updated", (data) => {
+      setPage(data.page);
+    });
 
-    return () => socket.off("file-uploaded");
+    return () => {
+      socket.off("file-uploaded");
+      socket.off("pdf-file-updated");
+      socket.off("pdf-page-updated");
+    };
   }, []);
 
   const handleFileChange = (event) => {
@@ -78,6 +90,7 @@ function FileView({ roomCode }) {
         setIsUploading(false);
         setOpenUploadDialog(false);
       } else {
+        toast.dismiss();
         setIsUploading(false);
         toast.error("Upload failed!");
         alert("Upload failed!");
@@ -94,6 +107,7 @@ function FileView({ roomCode }) {
     socket.emit("pdf-file-change", { roomCode, filename: file.path });
 
     socket.on("pdf-file-updated", (data) => {
+      console.log("File updated:", data);
       setSelectedFile(data.filename);
     });
   };

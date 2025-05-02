@@ -42,7 +42,10 @@ export default function VideoRoom({ roomCode }) {
         makeConnection(stream);
       })
       .catch((error) => {
-        console.error("Error accessing media devices:", error);
+        console.error(
+          "Error accessing media devices From ur own laptop:",
+          error
+        );
       });
 
     return () => {
@@ -145,7 +148,8 @@ export default function VideoRoom({ roomCode }) {
     socket.emit("fetch-users", roomCode);
 
     socket.on("users", (users) => {
-      users.forEach((user) => {
+      users.forEach(({ user, userName }) => {
+        console.log("User connected:", user, userName);
         const peerConnection = new RTCPeerConnection({
           iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         });
@@ -195,7 +199,7 @@ export default function VideoRoom({ roomCode }) {
 
         peerConnection.ontrack = (event) => {
           if (!document.getElementById(`video-${user}`)) {
-            createRemoteVideoElement(user, event.streams[0]);
+            createRemoteVideoElement(user, event.streams[0], userName);
           }
         };
       });
@@ -255,6 +259,6 @@ export default function VideoRoom({ roomCode }) {
   }
 
   return (
-    <div className="videoroom grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-[0.2px] min-h-screen overflow-auto" />
+    <div className="videoroom grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-[0.2px] min-h-screen overflow-auto custom-scrollbar" />
   );
 }
