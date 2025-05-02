@@ -19,6 +19,7 @@ function FileView({ roomCode }) {
   const [page, setPage] = useState(1);
   const [file, setFile] = useState(null);
   const [fileList, setFileList] = useState(data?.files || []);
+  const [isuploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(
     data?.activePdf?.filename || null
   );
@@ -56,6 +57,7 @@ function FileView({ roomCode }) {
       toast.error("Please select a file to upload.");
       return;
     }
+    setIsUploading(true);
     toast.loading("Uploading file...");
 
     const formData = new FormData();
@@ -72,8 +74,12 @@ function FileView({ roomCode }) {
         toast.dismiss();
 
         toast.success("File uploaded successfully!");
-        setOpenUploadDialog(false); // Close dialog after upload
+        setFile(null);
+        setIsUploading(false);
+        setOpenUploadDialog(false);
       } else {
+        setIsUploading(false);
+        toast.error("Upload failed!");
         alert("Upload failed!");
       }
     } catch (error) {
@@ -110,37 +116,44 @@ function FileView({ roomCode }) {
   };
 
   return (
-    <div className="p-2 flex flex-col items-center mt-16">
+    <div className="p-4 flex flex-col items-center mt-20  text-gray-200 min-h-screen overflow-x-hidden">
+      <Toaster position="top-right" />
       {/* Copy Room Code Button */}
       <Button
         variant="outline"
         onClick={copyRoomCode}
-        className="mb-4 bg-gray-800 text-white"
+        className="mb-6 bg-gray-800 text-white hover:bg-gray-700 transition-all"
       >
-        <span className="bg-white text-black rounded-sm px-2">{roomCode}</span>{" "}
+        <span className="bg-gray-900 text-gray-200 rounded-sm px-2 py-1 font-mono">
+          {roomCode}
+        </span>{" "}
         Copy Room Code
       </Button>
 
       {/* Buttons */}
-      <div className="flex gap-4">
+      <div className="flex gap-6 mb-6">
         {/* Upload Button */}
         <Dialog open={openUploadDialog} onOpenChange={setOpenUploadDialog}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="bg-gray-800 text-white">
+            <Button
+              variant="outline"
+              className="bg-blue-700 text-white hover:bg-blue-600 transition-all"
+            >
               Upload File
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <h2 className="text-lg font-semibold">Upload a File</h2>
+          <DialogContent className="p-6 bg-gray-800 text-gray-200 rounded-lg shadow-lg">
+            <h2 className="text-lg font-semibold mb-4">Upload a File</h2>
             <input
               type="file"
               accept="image/*,.pdf,.doc,.docx,.txt"
               onChange={handleFileChange}
-              className="border p-2 rounded w-full"
+              className="border p-2 rounded w-full mb-4 bg-gray-700 text-gray-200"
             />
             <Button
               onClick={handleUpload}
-              className="mt-2 bg-gray-700 text-white"
+              disabled={isuploading}
+              className="w-full bg-blue-700 text-white hover:bg-blue-600 transition-all"
             >
               Upload
             </Button>
@@ -150,17 +163,20 @@ function FileView({ roomCode }) {
         {/* Show Uploaded Files Button */}
         <Dialog open={openFileListDialog} onOpenChange={setOpenFileListDialog}>
           <DialogTrigger asChild>
-            <Button variant="outline" className="bg-gray-800 text-white">
+            <Button
+              variant="outline"
+              className="bg-green-700 text-white hover:bg-green-600 transition-all"
+            >
               Show Uploaded Files
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <h2 className="text-lg font-semibold">Uploaded Files</h2>
-            <ul className="mt-2">
+          <DialogContent className="p-6 bg-gray-800 text-gray-200 rounded-lg shadow-lg">
+            <h2 className="text-lg font-semibold mb-4">Uploaded Files</h2>
+            <ul className="space-y-2">
               {fileList.map((file, index) => (
                 <li
                   key={index}
-                  className="text-blue-600 cursor-pointer underline"
+                  className="text-blue-400 cursor-pointer underline hover:text-blue-300 transition-all"
                   onClick={() => handleFileSelect(file)}
                 >
                   {file.originalName}
@@ -173,27 +189,30 @@ function FileView({ roomCode }) {
 
       {/* File Viewer */}
       {selectedFile && (
-        <div className="mt-4 border p-4 rounded w-full max-w-3xl">
-          <div className="border p-2 overflow-auto max-h-[80vh]">
+        <div className="mt-6  rounded-lg w-full max-w-4xl bg-gray-900 shadow-lg">
+          <div className="border p-4 overflow-auto max-h-[80vh] bg-gray-800 rounded-lg">
             {selectedFile.endsWith(".pdf") ? (
               <>
-                <Document file={`${selectedFile}`} className="overflow-auto">
+                <Document
+                  file={`${selectedFile}`}
+                  className="overflow-auto custom-scrollbar"
+                >
                   <Page pageNumber={page} className="max-w-full h-auto" />
                 </Document>
-                <div className="flex justify-between mt-2">
+                <div className="flex justify-between mt-4">
                   <Button
                     variant="outline"
                     onClick={() => changePage(page - 1)}
-                    className="px-4 py-2 bg-gray-700 text-white"
+                    className="px-4 py-2 bg-gray-700 text-white hover:bg-gray-600 transition-all"
                   >
-                    ←
+                    ← Previous
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => changePage(page + 1)}
-                    className="px-4 py-2 bg-gray-700 text-white"
+                    className="px-4 py-2 bg-gray-700 text-white hover:bg-gray-600 transition-all"
                   >
-                    →
+                    Next →
                   </Button>
                 </div>
               </>
@@ -201,10 +220,12 @@ function FileView({ roomCode }) {
               <img
                 src={`${selectedFile}`}
                 alt="Uploaded"
-                className="max-w-full h-auto"
+                className="max-w-full h-auto rounded-lg"
               />
             ) : (
-              <p>File format not supported for preview.</p>
+              <p className="text-center text-gray-400">
+                File format not supported for preview.
+              </p>
             )}
           </div>
         </div>

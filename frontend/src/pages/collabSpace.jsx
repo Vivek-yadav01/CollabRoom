@@ -56,12 +56,14 @@ function CollabSpace() {
         </div>
 
         {/* Middle Section - PDF Viewer */}
-        <div className="w-1/2 h-full flex items-center justify-center mx-auto fixed left-1/3  border-gray-700 overflow-y-auto">
+        <div className="w-1/2 h-full flex items-center justify-center mx-auto fixed left-1/3  border-gray-700 overflow-y-auto custom-scrollbar bg-gray-800">
           <PdfView roomCode={roomCode} />
         </div>
 
+        <div className="w-px bg-gray-600"></div>
+
         {/* Right Section - Video Room */}
-        <div className="w-1/5 h-full p-4 fixed right-0 overflow-y-auto">
+        <div className="w-1/5 h-full p-4 fixed right-0 overflow-y-auto custom-scrollbar">
           <VideoRoom roomCode={roomCode} />
         </div>
       </div>

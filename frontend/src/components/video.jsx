@@ -1,15 +1,14 @@
 import React, { useEffect } from "react";
 import socket from "../utils/socket";
-import { data } from "react-router-dom";
+import { FiMic, FiMicOff, FiVideo, FiVideoOff } from "react-icons/fi";
+import { createRoot } from "react-dom/client";
 
 export default function VideoRoom({ roomCode }) {
   console.log("VideoRoom initialized with roomCode:", roomCode);
 
   useEffect(() => {
-    // handle user diconnection
     socket.on("user-left", (userId) => {
       console.log("user left:", userId);
-      console.log("User left:", userId);
       const video = document.getElementById(`video-${userId}`);
       if (video) {
         video.remove();
@@ -34,44 +33,7 @@ export default function VideoRoom({ roomCode }) {
             .play()
             .then(() => {
               console.log("Local video playback started.");
-
-              // Mute/Unmute button
-              const muteButton = document.createElement("button");
-              muteButton.innerHTML = "Mute";
-              muteButton.onclick = () => {
-                stream.getAudioTracks().forEach((track) => {
-                  track.enabled = !track.enabled;
-                });
-                muteButton.innerHTML = stream.getAudioTracks()[0].enabled
-                  ? "Mute"
-                  : "Unmute";
-              };
-
-              // Stop/Start Video button
-              const videoButton = document.createElement("button");
-              videoButton.innerHTML = "Stop";
-              videoButton.onclick = () => {
-                stream.getVideoTracks().forEach((track) => {
-                  track.enabled = !track.enabled;
-                });
-                videoButton.innerHTML = stream.getVideoTracks()[0].enabled
-                  ? "Stop "
-                  : "Start ";
-              };
-
-              const div = document.createElement("div");
-              div.appendChild(localVideo);
-              const div2 = document.createElement("div");
-              div2.appendChild(videoButton);
-              div2.appendChild(muteButton);
-              div.appendChild(div2);
-              div2.classList.add("flex");
-              div2.classList.add("flex-row");
-              div2.classList.add("justify-center");
-
-              div2.classList.add("space-x-2");
-
-              videoRoom.appendChild(div);
+              enableVideo(localVideo, stream, videoRoom);
             })
             .catch((err) => console.error("Local video playback error:", err));
         });
@@ -91,127 +53,99 @@ export default function VideoRoom({ roomCode }) {
     };
   }, []);
 
+  const enableVideo = (localVideo, stream, videoRoom) => {
+    let isMuted = false;
+    let isVideoOff = false;
+
+    const muteButton = document.createElement("button");
+    muteButton.className =
+      "flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition";
+    const muteIconRoot = createRoot(muteButton);
+    muteIconRoot.render(<FiMic />);
+    muteButton.onclick = () => {
+      stream
+        .getAudioTracks()
+        .forEach((track) => (track.enabled = !track.enabled));
+      isMuted = !isMuted;
+      muteIconRoot.render(isMuted ? <FiMicOff /> : <FiMic />);
+    };
+
+    const videoButton = document.createElement("button");
+    videoButton.className =
+      "flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition";
+    const videoIconRoot = createRoot(videoButton);
+    videoIconRoot.render(<FiVideo />);
+    videoButton.onclick = () => {
+      stream
+        .getVideoTracks()
+        .forEach((track) => (track.enabled = !track.enabled));
+      isVideoOff = !isVideoOff;
+      videoIconRoot.render(isVideoOff ? <FiVideoOff /> : <FiVideo />);
+    };
+
+    const controlBar = document.createElement("div");
+    controlBar.className = "flex space-x-4 mt-2";
+    controlBar.appendChild(muteButton);
+    controlBar.appendChild(videoButton);
+
+    const container = document.createElement("div");
+    container.className =
+      "flex flex-col items-center justify-center bg-gray-900 text-white rounded-lg p-4 shadow-lg";
+    container.appendChild(localVideo);
+    container.appendChild(controlBar);
+
+    videoRoom.appendChild(container);
+  };
+
   async function makeConnection(localStream) {
     socket.off("offer");
     socket.on("offer", async (data) => {
-      console.log(
-        "Offer received from:",
-        data.from,
-        "to:",
-        data.to,
-        "Socket ID:",
-        socket.id
-      );
+      if (data.to !== socket.id) return;
 
-      if (data.to === socket.id) {
-        console.log(
-          "Offer received for this socket.",
-          data.offer,
-          "me",
-          socket.id
-        );
-        try {
-          const peerConnection = new RTCPeerConnection({
-            iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-          });
+      try {
+        const peerConnection = new RTCPeerConnection({
+          iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+        });
 
-          localStream
-            .getTracks()
-            .forEach((track) => peerConnection.addTrack(track, localStream));
-          console.log("PeerConnection initialized for offer handling.");
+        localStream
+          .getTracks()
+          .forEach((track) => peerConnection.addTrack(track, localStream));
 
-          if (!peerConnection.onicecandidate) {
-            peerConnection.onicecandidate = (e) => {
-              if (e.candidate) {
-                console.log("ICE Candidate generated:", e.candidate);
-                socket.emit("ice-candidate", {
-                  to: data.from,
-                  candidate: e.candidate,
-                  from: socket.id,
-                });
-              }
-            };
+        peerConnection.onicecandidate = (e) => {
+          if (e.candidate) {
+            socket.emit("ice-candidate", {
+              to: data.from,
+              candidate: e.candidate,
+              from: socket.id,
+            });
           }
+        };
 
-          peerConnection.ontrack = (e) => {
-            console.log("Track received from peer:", e.streams[0]);
-
-            if (e.streams[0]) {
-              let existingVideo = document.getElementById(`video-${data.from}`);
-
-              if (!existingVideo) {
-                const remoteVideo = document.createElement("video");
-                remoteVideo.id = `video-${data.from}`; // Assign a unique ID
-                remoteVideo.srcObject = e.streams[0];
-                remoteVideo.autoplay = true;
-
-                const btn = document.createElement("button");
-                btn.innerHTML = "Mute";
-                btn.onclick = () => {
-                  if (remoteVideo.muted) {
-                    remoteVideo.muted = false;
-                    btn.innerHTML = "Unmute";
-                  } else {
-                    remoteVideo.muted = true;
-                    btn.innerHTML = "Mute";
-                  }
-                };
-
-                const vdoff = document.createElement("button");
-                vdoff.innerHTML = "Stop ";
-                vdoff.onclick = () => {
-                  if (remoteVideo.paused) {
-                    remoteVideo.play();
-                    vdoff.innerHTML = "Stop ";
-                  } else {
-                    remoteVideo.pause();
-                    vdoff.innerHTML = "Start ";
-                  }
-                };
-                const h2 = document.createElement("h1");
-                h2.innerHTML = data.user;
-
-                const div = document.createElement("div");
-                const div2 = document.createElement("div");
-                div2.appendChild(vdoff);
-                div2.appendChild(btn);
-                div.appendChild(remoteVideo);
-                div.appendChild(div2);
-
-                div.appendChild(h2);
-                div.id = "video-" + data.from;
-                document.querySelector(".videoroom").appendChild(div);
-
-                console.log("Remote video added for user:", data.from);
-              } else {
-                console.log(
-                  "Video element already exists for user:",
-                  data.from
-                );
-              }
+        peerConnection.ontrack = (e) => {
+          if (e.streams[0]) {
+            if (!document.getElementById(`video-${data.from}`)) {
+              createRemoteVideoElement(data.from, e.streams[0], data.user);
             }
-          };
+          }
+        };
 
-          await peerConnection.setRemoteDescription(data.offer);
-          const answer = await peerConnection.createAnswer();
-          await peerConnection.setLocalDescription(answer);
-
-          console.log("Answer created and sent to:", data.from);
-          socket.emit("answer", {
-            to: data.from,
-            answer,
-            from: socket.id,
-          });
-        } catch (error) {
-          console.error("Error handling offer:", error);
-        }
+        await peerConnection.setRemoteDescription(data.offer);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.emit("answer", {
+          to: data.from,
+          answer,
+          from: socket.id,
+        });
+      } catch (error) {
+        console.error("Error handling offer:", error);
       }
     });
 
     socket.emit("fetch-users", roomCode);
+
     socket.on("users", (users) => {
       users.forEach((user) => {
-        console.log("Connecting to user:", user);
         const peerConnection = new RTCPeerConnection({
           iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
         });
@@ -224,8 +158,6 @@ export default function VideoRoom({ roomCode }) {
           try {
             const offer = await peerConnection.createOffer();
             await peerConnection.setLocalDescription(offer);
-
-            console.log("Offer created and sent to:", user);
             socket.emit("offer", { to: user, offer, from: socket.id });
           } catch (e) {
             console.error("Error making offer:", e);
@@ -234,7 +166,6 @@ export default function VideoRoom({ roomCode }) {
 
         peerConnection.onicecandidate = (e) => {
           if (e.candidate) {
-            console.log("ICE Candidate found:", e.candidate);
             socket.emit("ice-candidate", {
               to: user,
               candidate: e.candidate,
@@ -244,32 +175,15 @@ export default function VideoRoom({ roomCode }) {
         };
 
         socket.on("answer", async (data) => {
-          console.log(
-            "Answer received from:",
-            data.from,
-            "to:",
-            data.to,
-            data.answer
-          );
-
-          if (data.from === user) {
-            data.answer;
-            try {
-              await peerConnection.setRemoteDescription(data.answer);
-              console.log("Remote description set.");
-            } catch (error) {
-              console.error("Error setting remote description:", error);
-            }
+          if (data.from !== user) return;
+          try {
+            await peerConnection.setRemoteDescription(data.answer);
+          } catch (error) {
+            console.error("Error setting remote description:", error);
           }
         });
 
         socket.on("ice-candidate", (data) => {
-          console.log(
-            "ICE Candidate received from:",
-            data.from,
-            "to:",
-            data.to
-          );
           if (data.to === socket.id) {
             try {
               peerConnection.addIceCandidate(data.candidate);
@@ -278,54 +192,69 @@ export default function VideoRoom({ roomCode }) {
             }
           }
         });
+
         peerConnection.ontrack = (event) => {
-          console.log("Track received:", event.streams[0]);
-
-          let existingVideo = document.getElementById(`video-${user}`);
-          if (!existingVideo) {
-            const remoteVideo = document.createElement("video");
-            remoteVideo.id = `video-${user}`; // Assign unique ID
-            remoteVideo.srcObject = event.streams[0];
-            remoteVideo.autoplay = true;
-            const btn = document.createElement("button");
-            btn.innerHTML = "Mute";
-            btn.onclick = () => {
-              if (remoteVideo.muted) {
-                remoteVideo.muted = false;
-                btn.innerHTML = "Unmute";
-              } else {
-                remoteVideo.muted = true;
-                btn.innerHTML = "Mute";
-              }
-            };
-            const vdoff = document.createElement("button");
-            vdoff.innerHTML = "Stop ";
-            vdoff.onclick = () => {
-              if (remoteVideo.paused) {
-                remoteVideo.play();
-                vdoff.innerHTML = "Stop ";
-              } else {
-                remoteVideo.pause();
-                vdoff.innerHTML = "Start ";
-              }
-            };
-            const h1 = document.createElement("h1");
-            h1.innerHTML = data?.user || "User";
-            const div = document.createElement("div");
-            const div2 = document.createElement("div");
-            div2.appendChild(vdoff);
-            div2.appendChild(btn);
-            div.appendChild(remoteVideo);
-            div.appendChild(div2);
-
-            div.appendChild(h1);
-            div.id = "video-" + user;
-            document.querySelector(".videoroom").appendChild(div);
+          if (!document.getElementById(`video-${user}`)) {
+            createRemoteVideoElement(user, event.streams[0]);
           }
         };
       });
     });
   }
 
-  return <div className="videoroom  bg-gray-900"></div>;
+  function createRemoteVideoElement(userId, stream, username = "Remote User") {
+    const videoRoom = document.querySelector(".videoroom");
+
+    const remoteVideo = document.createElement("video");
+    remoteVideo.id = `video-${userId}`;
+    remoteVideo.srcObject = stream;
+    remoteVideo.autoplay = true;
+
+    const muteBtn = document.createElement("button");
+    muteBtn.className =
+      "flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition";
+    let muted = false;
+    const muteIcon = createRoot(muteBtn);
+    muteIcon.render(<FiMic />);
+    muteBtn.onclick = () => {
+      muted = !muted;
+      remoteVideo.muted = muted;
+      muteIcon.render(muted ? <FiMicOff /> : <FiMic />);
+    };
+
+    const videoBtn = document.createElement("button");
+    videoBtn.className =
+      "flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600 transition";
+    let videoPaused = false;
+    const videoIcon = createRoot(videoBtn);
+    videoIcon.render(<FiVideo />);
+    videoBtn.onclick = () => {
+      videoPaused = !videoPaused;
+      videoPaused ? remoteVideo.pause() : remoteVideo.play();
+      videoIcon.render(videoPaused ? <FiVideoOff /> : <FiVideo />);
+    };
+
+    const nameLabel = document.createElement("h2");
+    nameLabel.innerText = username;
+    nameLabel.className = "text-white text-lg font-semibold mb-2";
+
+    const controls = document.createElement("div");
+    controls.className = "flex space-x-4 mt-2";
+    controls.appendChild(muteBtn);
+    controls.appendChild(videoBtn);
+
+    const container = document.createElement("div");
+    container.id = `video-${userId}`;
+    container.className =
+      "flex flex-col items-center justify-center bg-gray-800 rounded-lg p-4 shadow-lg";
+    container.appendChild(nameLabel);
+    container.appendChild(remoteVideo);
+    container.appendChild(controls);
+
+    videoRoom.appendChild(container);
+  }
+
+  return (
+    <div className="videoroom grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-[0.2px] min-h-screen overflow-auto" />
+  );
 }

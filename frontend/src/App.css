@@ -25,3 +25,18 @@
   margin-left: 40px;
   overflow-x: hidden;
 }
+
+/* Add this to your global CSS file or index.css */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 1px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgb(75, 85, 99); /* Light gray background for the track */
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(75, 85, 99); /* red-600-like */
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(75, 85, 99);
+}
