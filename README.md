@@ -6,7 +6,7 @@
 
 ## 🚀 Features
 
-- 🔐 **No Authentication**: Anyone can create or join a room using a unique room code.
+
 - 💬 **Live Chat**: Message all room participants in real time.
 - 🎥 **Real-Time Audio/Video Sharing**:
   - Everyone in the room can share their video/audio.
