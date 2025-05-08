@@ -28,7 +28,7 @@
 - **Frontend**: React.js, Tailwind CSS, React-PDF, Canvas API, WebRTC
 - **Backend**: Node.js, Express.js
 - **Real-Time Communication**: Socket.IO, WebRTC (for media)
-- **File Upload**: Multer (with optional Cloudinary support)
+- **File Upload**: Multer (with Cloudinary)
 - **PDF/Image Rendering**: `react-pdf`, HTML5 image tag
 
 ---
@@ -41,6 +41,7 @@ collabroom/
 ├── backend/           # Express.js backend with Socket.IO & WebRTC signaling
 │   └── uploads/       # Uploaded documents/images
 ├── README.md
+```
 
 
 
